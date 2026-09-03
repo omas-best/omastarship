@@ -1,0 +1,24 @@
+{
+  "name": "omastarship",
+  "version": "0.1.0",
+  "description": "Cinematic, TTY-safe rocket animations for interactive Git pushes and pulls on Omarchy.",
+  "author": {
+    "name": "OmaStarship contributors"
+  },
+  "license": "MIT",
+  "keywords": ["omarchy", "git", "terminal", "animation"],
+  "interface": {
+    "displayName": "OmaStarship",
+    "shortDescription": "Rocket animations for interactive Git push and pull.",
+    "longDescription": "Adds a reversible Bash integration that animates interactive Git pushes and pulls without changing Git arguments, output, prompts, or configuration.",
+    "developerName": "OmaStarship contributors",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive"],
+    "defaultPrompt": [
+      "Help me install OmaStarship.",
+      "Show me how to configure OmaStarship.",
+      "Help me test the OmaStarship Git wrapper."
+    ],
+    "brandColor": "#22D3EE"
+  }
+}

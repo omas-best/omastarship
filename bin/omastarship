@@ -1,0 +1,369 @@
+#!/usr/bin/env bash
+
+# OmaStarship command and animation renderer.
+set -u
+
+OMASTARSHIP_VERSION="0.1.0"
+_omastarship_alt_active=0
+_omastarship_resize_pending=0
+_omastarship_rows=24
+_omastarship_cols=80
+_omastarship_tty=${OMASTARSHIP_TTY:-/dev/tty}
+
+_omastarship_config_home() {
+  printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/omastarship"
+}
+
+_omastarship_trim() {
+  local value=$1
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+_omastarship_bool() {
+  case ${1,,} in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_omastarship_load_config() {
+  enabled=true
+  push_animation=true
+  pull_animation=true
+  speed=normal
+  colors=omarchy
+  show_status=true
+
+  local file line key value
+  file="$(_omastarship_config_home)/config"
+  if [[ -r $file ]]; then
+    while IFS= read -r line || [[ -n $line ]]; do
+      line=${line%%#*}
+      [[ $line == *=* ]] || continue
+      key=$(_omastarship_trim "${line%%=*}")
+      value=$(_omastarship_trim "${line#*=}")
+      case $key in
+        enabled|push_animation|pull_animation|show_status)
+          case ${value,,} in true|false|1|0|yes|no|on|off) printf -v "$key" '%s' "$value" ;; esac
+          ;;
+        speed)
+          case $value in fast|normal|cinematic) speed=$value ;; esac
+          ;;
+        colors)
+          case $value in omarchy|none) colors=$value ;; esac
+          ;;
+      esac
+    done < "$file"
+  fi
+
+  [[ ${OMASTARSHIP+x} ]] && enabled=$OMASTARSHIP
+  [[ ${OMASTARSHIP_PUSH_ANIMATION+x} ]] && push_animation=$OMASTARSHIP_PUSH_ANIMATION
+  [[ ${OMASTARSHIP_PULL_ANIMATION+x} ]] && pull_animation=$OMASTARSHIP_PULL_ANIMATION
+  [[ ${OMASTARSHIP_SPEED+x} ]] && speed=$OMASTARSHIP_SPEED
+  [[ ${OMASTARSHIP_COLORS+x} ]] && colors=$OMASTARSHIP_COLORS
+  [[ ${OMASTARSHIP_SHOW_STATUS+x} ]] && show_status=$OMASTARSHIP_SHOW_STATUS
+
+  case $speed in fast|normal|cinematic) ;; *) speed=normal ;; esac
+  case $colors in omarchy|none) ;; *) colors=omarchy ;; esac
+}
+
+_omastarship_measure() {
+  local measured
+  measured=$(stty size < "$_omastarship_tty" 2>/dev/null) || measured="24 80"
+  read -r _omastarship_rows _omastarship_cols <<< "$measured"
+  [[ $_omastarship_rows =~ ^[0-9]+$ ]] || _omastarship_rows=24
+  [[ $_omastarship_cols =~ ^[0-9]+$ ]] || _omastarship_cols=80
+  ((_omastarship_rows > 0)) || _omastarship_rows=24
+  ((_omastarship_cols > 0)) || _omastarship_cols=80
+  _omastarship_resize_pending=0
+}
+
+_omastarship_cleanup() {
+  if ((_omastarship_alt_active)); then
+    printf '\033[0m\033[?25h\033[?1049l' > "$_omastarship_tty" 2>/dev/null || true
+    _omastarship_alt_active=0
+  fi
+}
+
+_omastarship_interrupted() {
+  local status=$1
+  _omastarship_cleanup
+  trap - EXIT INT TERM HUP WINCH
+  exit "$status"
+}
+
+_omastarship_begin() {
+  [[ -w $_omastarship_tty ]] || return 1
+  _omastarship_measure
+  trap '_omastarship_cleanup' EXIT
+  trap '_omastarship_interrupted 130' INT
+  trap '_omastarship_interrupted 143' TERM
+  trap '_omastarship_interrupted 129' HUP
+  trap '_omastarship_resize_pending=1' WINCH
+  printf '\033[?1049h\033[?25l\033[2J\033[H' > "$_omastarship_tty" || return 1
+  _omastarship_alt_active=1
+}
+
+_omastarship_end() {
+  _omastarship_cleanup
+  trap - EXIT INT TERM HUP WINCH
+}
+
+_omastarship_delay() {
+  local delay
+  case $speed in
+    fast) delay=0.045 ;;
+    cinematic) delay=0.140 ;;
+    *) delay=0.085 ;;
+  esac
+  if [[ ${OMASTARSHIP_TEST_NO_SLEEP:-0} != 1 ]]; then
+    sleep "$delay"
+  fi
+}
+
+_omastarship_colors() {
+  cyan='' blue='' purple='' white='' orange='' dim='' reset=''
+  if [[ $colors == omarchy && -z ${NO_COLOR:-} ]]; then
+    cyan=$'\033[38;5;51m'
+    blue=$'\033[38;5;39m'
+    purple=$'\033[38;5;141m'
+    white=$'\033[38;5;255m'
+    orange=$'\033[38;5;214m'
+    dim=$'\033[2m'
+    reset=$'\033[0m'
+  fi
+}
+
+_omastarship_at() {
+  local row=$1 col=$2 value=$3
+  ((row >= 1 && row <= _omastarship_rows && col >= 1 && col <= _omastarship_cols)) || return 0
+  printf '\033[%d;%dH%s' "$row" "$col" "$value" > "$_omastarship_tty"
+}
+
+_omastarship_clear() {
+  printf '\033[2J\033[H' > "$_omastarship_tty"
+}
+
+_omastarship_small_frame() {
+  local action=$1 frame=$2 total=$3 label marker width col
+  if [[ $action == push ]]; then label='PUSH  [ launch ]'; else label='PULL  [ catch  ]'; fi
+  width=$((_omastarship_cols - ${#label} - 4))
+  ((width < 1)) && width=1
+  marker=$((frame * width / total))
+  ((marker < 1)) && marker=1
+  col=$marker
+  _omastarship_clear
+  _omastarship_at 1 1 "${cyan}${label}${reset}"
+  _omastarship_at 2 "$col" "${orange}^${reset}"
+}
+
+_omastarship_draw_rocket() {
+  local row=$1 col=$2 exhaust=${3:-0}
+  _omastarship_at "$row" "$col" "${white}  /\\  ${reset}"
+  _omastarship_at "$((row + 1))" "$col" "${cyan} /  \\ ${reset}"
+  _omastarship_at "$((row + 2))" "$col" "${blue}| OM |${reset}"
+  _omastarship_at "$((row + 3))" "$col" "${purple}|____|${reset}"
+  if ((exhaust == 1)); then
+    _omastarship_at "$((row + 4))" "$col" "${orange} \\**/ ${reset}"
+  elif ((exhaust == 2)); then
+    _omastarship_at "$((row + 4))" "$col" "${orange} \\##/ ${reset}"
+    _omastarship_at "$((row + 5))" "$col" "${orange}  \/  ${reset}"
+  else
+    _omastarship_at "$((row + 4))" "$col" "${dim} /\\/\\ ${reset}"
+  fi
+}
+
+_omastarship_draw_tower() {
+  local base=$1 left=$2 arms=$3
+  _omastarship_at "$((base - 6))" "$left" "${cyan}|           |${reset}"
+  if ((arms == 0)); then
+    _omastarship_at "$((base - 5))" "$left" "${cyan}|--       --|${reset}"
+    _omastarship_at "$((base - 4))" "$left" "${cyan}|           |${reset}"
+  elif ((arms == 1)); then
+    _omastarship_at "$((base - 5))" "$left" "${cyan}|---\\   /---|${reset}"
+    _omastarship_at "$((base - 4))" "$left" "${cyan}|    \ /    |${reset}"
+  else
+    _omastarship_at "$((base - 5))" "$left" "${cyan}|----\ /----|${reset}"
+    _omastarship_at "$((base - 4))" "$left" "${cyan}|     V     |${reset}"
+  fi
+  _omastarship_at "$((base - 3))" "$left" "${blue}|           |${reset}"
+  _omastarship_at "$((base - 2))" "$left" "${blue}|           |${reset}"
+  _omastarship_at "$((base - 1))" "$left" "${purple}|___________|${reset}"
+  _omastarship_at "$base" "$((left - 2))" "${purple}=================${reset}"
+}
+
+_omastarship_push() {
+  local total=11 frame row col exhaust
+  for ((frame = 0; frame < total; frame++)); do
+    ((_omastarship_resize_pending)) && _omastarship_measure
+    if ((_omastarship_cols < 40 || _omastarship_rows < 12)); then
+      _omastarship_small_frame push "$((frame + 1))" "$total"
+    else
+      col=$((_omastarship_cols / 2 - 3))
+      row=$((_omastarship_rows - 7 - frame * (_omastarship_rows - 8) / (total - 1)))
+      ((row < 1)) && row=1
+      if ((frame < 2)); then exhaust=$frame; else exhaust=2; fi
+      _omastarship_clear
+      _omastarship_at 1 3 "${dim}OMASTARSHIP / PUSH${reset}"
+      _omastarship_draw_rocket "$row" "$col" "$exhaust"
+    fi
+    _omastarship_delay
+  done
+}
+
+_omastarship_pull() {
+  local total=12 frame row col base left arms travel
+  for ((frame = 0; frame < total; frame++)); do
+    ((_omastarship_resize_pending)) && _omastarship_measure
+    if ((_omastarship_cols < 40 || _omastarship_rows < 12)); then
+      _omastarship_small_frame pull "$((frame + 1))" "$total"
+    else
+      base=$((_omastarship_rows - 2))
+      left=$((_omastarship_cols / 2 - 6))
+      col=$((_omastarship_cols / 2 - 3))
+      travel=$((_omastarship_rows - 12))
+      ((travel < 1)) && travel=1
+      row=$((1 + frame * travel / (total - 1)))
+      if ((frame < 7)); then arms=0; elif ((frame < 10)); then arms=1; else arms=2; fi
+      _omastarship_clear
+      _omastarship_at 1 3 "${dim}OMASTARSHIP / PULL${reset}"
+      _omastarship_draw_tower "$base" "$left" "$arms"
+      _omastarship_draw_rocket "$row" "$col" 0
+      if ((frame == total - 1)) && _omastarship_bool "$show_status"; then
+        _omastarship_at "$((base + 1))" "$((_omastarship_cols / 2 - 3))" "${white}CAUGHT${reset}"
+      fi
+    fi
+    _omastarship_delay
+  done
+}
+
+_omastarship_animate() {
+  local action=$1
+  _omastarship_load_config
+  _omastarship_bool "$enabled" || return 0
+  if [[ $action == push ]]; then
+    _omastarship_bool "$push_animation" || return 0
+  else
+    _omastarship_bool "$pull_animation" || return 0
+  fi
+  [[ ${TERM:-dumb} != dumb ]] || return 0
+  _omastarship_colors
+  _omastarship_begin || return 0
+  if [[ $action == push ]]; then _omastarship_push; else _omastarship_pull; fi
+  _omastarship_end
+}
+
+_omastarship_write_setting() {
+  local key=$1 value=$2 dir file tmp found=0 line current
+  dir=$(_omastarship_config_home)
+  file="$dir/config"
+  mkdir -p "$dir" || return 1
+  umask 077
+  tmp=$(mktemp "$dir/.config.XXXXXX") || return 1
+  if [[ -r $file ]]; then
+    while IFS= read -r line || [[ -n $line ]]; do
+      current=${line%%=*}
+      current=$(_omastarship_trim "$current")
+      if [[ $current == "$key" && $line == *=* ]]; then
+        printf '%s=%s\n' "$key" "$value" >> "$tmp"
+        found=1
+      else
+        printf '%s\n' "$line" >> "$tmp"
+      fi
+    done < "$file"
+  fi
+  ((found)) || printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  mv "$tmp" "$file"
+}
+
+_omastarship_print_config() {
+  _omastarship_load_config
+  printf 'config=%s/config\n' "$(_omastarship_config_home)"
+  printf 'enabled=%s\n' "$enabled"
+  printf 'push_animation=%s\n' "$push_animation"
+  printf 'pull_animation=%s\n' "$pull_animation"
+  printf 'speed=%s\n' "$speed"
+  printf 'colors=%s\n' "$colors"
+  printf 'show_status=%s\n' "$show_status"
+}
+
+_omastarship_usage() {
+  cat <<'EOF'
+Usage: omastarship <command>
+
+Commands:
+  demo push|pull   Play an animation without running Git
+  enable           Enable animations in the user config
+  disable          Disable animations in the user config
+  status           Show version, shell integration, and effective settings
+  config           Print the effective configuration
+  help             Show this help
+EOF
+}
+
+case ${1:-help} in
+  demo)
+    case ${2:-} in
+      push|pull)
+        if [[ -t 0 && -t 1 && -t 2 ]]; then
+          _omastarship_animate "$2"
+        else
+          printf 'omastarship: demos need an interactive terminal\n' >&2
+          exit 2
+        fi
+        ;;
+      *) printf 'Usage: omastarship demo <push|pull>\n' >&2; exit 2 ;;
+    esac
+    ;;
+  enable)
+    _omastarship_write_setting enabled true
+    printf 'OmaStarship enabled.\n'
+    ;;
+  disable)
+    _omastarship_write_setting enabled false
+    printf 'OmaStarship disabled.\n'
+    ;;
+  config)
+    _omastarship_print_config
+    ;;
+  status)
+    printf 'OmaStarship %s\n' "$OMASTARSHIP_VERSION"
+    if [[ ${OMASTARSHIP_SHELL_ACTIVE:-0} == 1 ]]; then
+      printf 'shell_integration=active\n'
+    else
+      printf 'shell_integration=%s\n' "${OMASTARSHIP_SHELL_ACTIVE:-not-detected}"
+    fi
+    _omastarship_print_config
+    ;;
+  _exec-git)
+    action=${2:-}
+    [[ $action == push || $action == pull ]] || exit 2
+    shift 2
+    git_bin=${OMASTARSHIP_GIT_BIN:-}
+    if [[ -z $git_bin || ! -x $git_bin ]]; then
+      git_bin=$(type -P git) || {
+        printf 'omastarship: cannot find the Git executable\n' >&2
+        exit 127
+      }
+    fi
+    if [[ -t 0 && -t 1 && -t 2 ]]; then
+      _omastarship_animate "$action" || true
+    fi
+    _omastarship_cleanup
+    trap - EXIT INT TERM HUP WINCH
+    exec "$git_bin" "$@"
+    ;;
+  help|-h|--help)
+    _omastarship_usage
+    ;;
+  version|-V|--version)
+    printf '%s\n' "$OMASTARSHIP_VERSION"
+    ;;
+  *)
+    printf 'omastarship: unknown command: %s\n' "$1" >&2
+    _omastarship_usage >&2
+    exit 2
+    ;;
+esac

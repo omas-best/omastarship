@@ -1,0 +1,7 @@
+# OmaStarship configuration
+enabled=true
+push_animation=true
+pull_animation=true
+speed=normal
+colors=omarchy
+show_status=true
