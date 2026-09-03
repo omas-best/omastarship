@@ -1,7 +1,7 @@
 {
   "name": "omastarship",
-  "version": "0.1.0",
-  "description": "Cinematic, TTY-safe rocket animations for interactive Git pushes and pulls on Omarchy.",
+  "version": "0.2.0",
+  "description": "Illustrated, TTY-safe rocket animations for interactive Git pushes and pulls on Omarchy.",
   "author": {
     "name": "OmaStarship contributors"
   },

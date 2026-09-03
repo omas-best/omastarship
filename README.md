@@ -4,7 +4,7 @@ Turn Git pushes into rocket launches and Git pulls into booster catches.
 
 ![OmaStarship illustrated rocket states](assets/rocket-concept-v2.png)
 
-The concept sheet shows ignition, launch, controlled descent, and the tower catch. The CLI demos below remain the source of truth for the terminal animation.
+The same illustrated ignition, launch, controlled-descent, and tower-catch states are rendered directly in supported terminals. Foot on Omarchy uses its built-in Sixel image support. Other terminals fall back to the compact ANSI renderer unless Sixel is explicitly enabled.
 
 OmaStarship adds a short animation before interactive `git push` and `git pull` commands. It then gets out of the way and replaces itself with the real Git executable. Git receives the original argument array and direct access to stdin, stdout, and stderr.
 
@@ -32,6 +32,7 @@ Run:
 The installer:
 
 - copies the executable and shell integration under `${XDG_DATA_HOME:-$HOME/.local/share}/omastarship`
+- installs the illustrated rocket sheet used by the terminal renderer
 - creates a managed symlink at `${OMASTARSHIP_BIN_HOME:-$HOME/.local/bin}/omastarship`
 - creates the config only when one does not exist
 - backs up `.bashrc`, then adds one marked source block
@@ -78,10 +79,11 @@ push_animation=true
 pull_animation=true
 speed=normal
 colors=omarchy
+graphics=auto
 show_status=true
 ```
 
-Valid speeds are `fast`, `normal`, and `cinematic`. Valid color modes are `omarchy` and `none`. `NO_COLOR` also disables colors. Environment variables override the file for one process:
+Valid speeds are `fast`, `normal`, and `cinematic`. Valid color modes are `omarchy` and `none`. `NO_COLOR` also disables ANSI colors. `graphics=auto` displays the packaged illustrations in Foot, `graphics=sixel` explicitly enables them on another Sixel-capable terminal, and `graphics=ascii` always uses the fallback. No image converter runs during Git commands. Environment variables override the file for one process:
 
 ```text
 OMASTARSHIP
@@ -89,6 +91,7 @@ OMASTARSHIP_PUSH_ANIMATION
 OMASTARSHIP_PULL_ANIMATION
 OMASTARSHIP_SPEED
 OMASTARSHIP_COLORS
+OMASTARSHIP_GRAPHICS
 OMASTARSHIP_SHOW_STATUS
 ```
 
@@ -132,13 +135,15 @@ The safety suite uses a fake Git executable to verify argument bytes, standard s
 
 ## Current scope
 
-This prototype supports Bash, the default shell on the inspected Omarchy 4.0.1 system. Zsh and Fish are not implemented. It has been exercised under a pseudo-terminal, not manually certified in every Omarchy terminal. The renderer uses common ANSI alternate-screen and cursor controls expected by the four terminal choices exposed by current Omarchy.
+This prototype supports Bash, the default shell on the inspected Omarchy 4.0.1 system. Zsh and Fish are not implemented. The illustrated renderer uses packaged Sixel frames in Foot; other terminals receive the ANSI fallback unless they are explicitly configured for Sixel. The byte stream and cleanup behavior have been exercised under a pseudo-terminal, but the image has not been visually certified in every terminal exposed by Omarchy.
 
 Research references:
 
 - [Omarchy's current Bash user configuration layout](https://github.com/omacom/omarchy/blob/quattro/default/bashrc)
 - [Omarchy's current terminal selector](https://github.com/omacom/omarchy/blob/quattro/bin/omarchy-default-terminal)
 - [Omarchy releases](https://github.com/omacom/omarchy/releases)
+- [Foot Sixel configuration](https://man.archlinux.org/man/foot.ini.5.en)
+- [img2sixel manual](https://man.archlinux.org/man/extra/libsixel/img2sixel.1.en)
 
 ## License
 

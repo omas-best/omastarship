@@ -20,7 +20,7 @@ if [[ $start_count != "$end_count" || $start_count -gt 1 ]]; then
   exit 1
 fi
 
-mkdir -p "$install_root/bin" "$install_root/shell" "$config_home/omastarship" "$bin_home"
+mkdir -p "$install_root/bin" "$install_root/shell" "$install_root/assets/sixel" "$config_home/omastarship" "$bin_home"
 
 if [[ -L $command_path ]]; then
   if [[ $(readlink "$command_path") != "$install_root/bin/omastarship" ]]; then
@@ -34,6 +34,8 @@ fi
 
 install -m 0755 "$root/bin/omastarship" "$install_root/bin/omastarship"
 install -m 0644 "$root/shell/omastarship.bash" "$install_root/shell/omastarship.bash"
+install -m 0644 "$root/assets/rocket-concept-v2.png" "$install_root/assets/rocket-concept-v2.png"
+install -m 0644 "$root"/assets/sixel/*.sixel "$install_root/assets/sixel/"
 if [[ ! -e $config_home/omastarship/config ]]; then
   install -m 0600 "$root/config.example" "$config_home/omastarship/config"
 fi

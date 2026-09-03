@@ -3,7 +3,7 @@
 # OmaStarship command and animation renderer.
 set -u
 
-OMASTARSHIP_VERSION="0.1.0"
+OMASTARSHIP_VERSION="0.2.0"
 _omastarship_alt_active=0
 _omastarship_resize_pending=0
 _omastarship_rows=24
@@ -34,6 +34,7 @@ _omastarship_load_config() {
   pull_animation=true
   speed=normal
   colors=omarchy
+  graphics=auto
   show_status=true
 
   local file line key value
@@ -54,6 +55,9 @@ _omastarship_load_config() {
         colors)
           case $value in omarchy|none) colors=$value ;; esac
           ;;
+        graphics)
+          case $value in auto|sixel|ascii) graphics=$value ;; esac
+          ;;
       esac
     done < "$file"
   fi
@@ -63,10 +67,12 @@ _omastarship_load_config() {
   [[ ${OMASTARSHIP_PULL_ANIMATION+x} ]] && pull_animation=$OMASTARSHIP_PULL_ANIMATION
   [[ ${OMASTARSHIP_SPEED+x} ]] && speed=$OMASTARSHIP_SPEED
   [[ ${OMASTARSHIP_COLORS+x} ]] && colors=$OMASTARSHIP_COLORS
+  [[ ${OMASTARSHIP_GRAPHICS+x} ]] && graphics=$OMASTARSHIP_GRAPHICS
   [[ ${OMASTARSHIP_SHOW_STATUS+x} ]] && show_status=$OMASTARSHIP_SHOW_STATUS
 
   case $speed in fast|normal|cinematic) ;; *) speed=normal ;; esac
   case $colors in omarchy|none) ;; *) colors=omarchy ;; esac
+  case $graphics in auto|sixel|ascii) ;; *) graphics=auto ;; esac
 }
 
 _omastarship_measure() {
@@ -144,6 +150,68 @@ _omastarship_at() {
 
 _omastarship_clear() {
   printf '\033[2J\033[H' > "$_omastarship_tty"
+}
+
+_omastarship_art_dir() {
+  if [[ -n ${OMASTARSHIP_ART_DIR:-} ]]; then
+    printf '%s\n' "$OMASTARSHIP_ART_DIR"
+    return
+  fi
+
+  local executable
+  executable=$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null) || executable=${BASH_SOURCE[0]}
+  printf '%s/../assets/sixel\n' "$(dirname -- "$executable")"
+}
+
+_omastarship_can_sixel() {
+  local art_dir
+  [[ $graphics != ascii ]] || return 1
+  art_dir=$(_omastarship_art_dir)
+  [[ -r $art_dir/ignition.sixel && -r $art_dir/launch.sixel && -r $art_dir/descent.sixel && -r $art_dir/catch.sixel ]] || return 1
+  [[ $graphics == sixel ]] && return 0
+  case ${TERM:-} in
+    foot*|*sixel*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_omastarship_graphics_delay() {
+  local repeats
+  case $speed in
+    fast) repeats=2 ;;
+    cinematic) repeats=7 ;;
+    *) repeats=4 ;;
+  esac
+  while ((repeats-- > 0)); do _omastarship_delay; done
+}
+
+_omastarship_sixel_frame() {
+  local frame=$1 label=$2 asset col
+  asset="$(_omastarship_art_dir)/$frame.sixel"
+  col=$((_omastarship_cols / 2 - 12))
+  ((col < 1)) && col=1
+
+  _omastarship_clear
+  _omastarship_at 1 3 "${dim}OMASTARSHIP / ${label}${reset}"
+  printf '\033[2;%dH' "$col" > "$_omastarship_tty"
+  command cat -- "$asset" > "$_omastarship_tty"
+}
+
+_omastarship_push_sixel() {
+  _omastarship_sixel_frame ignition PUSH || return 1
+  _omastarship_graphics_delay
+  _omastarship_sixel_frame launch PUSH || return 1
+  _omastarship_graphics_delay
+}
+
+_omastarship_pull_sixel() {
+  _omastarship_sixel_frame descent PULL || return 1
+  _omastarship_graphics_delay
+  _omastarship_sixel_frame catch PULL || return 1
+  if _omastarship_bool "$show_status"; then
+    _omastarship_at 2 3 "${white}CAUGHT${reset}"
+  fi
+  _omastarship_graphics_delay
 }
 
 _omastarship_small_frame() {
@@ -251,7 +319,17 @@ _omastarship_animate() {
   [[ ${TERM:-dumb} != dumb ]] || return 0
   _omastarship_colors
   _omastarship_begin || return 0
-  if [[ $action == push ]]; then _omastarship_push; else _omastarship_pull; fi
+  if ((_omastarship_cols >= 40 && _omastarship_rows >= 18)) && _omastarship_can_sixel; then
+    if [[ $action == push ]]; then
+      _omastarship_push_sixel || _omastarship_push
+    else
+      _omastarship_pull_sixel || _omastarship_pull
+    fi
+  elif [[ $action == push ]]; then
+    _omastarship_push
+  else
+    _omastarship_pull
+  fi
   _omastarship_end
 }
 
@@ -286,6 +364,7 @@ _omastarship_print_config() {
   printf 'pull_animation=%s\n' "$pull_animation"
   printf 'speed=%s\n' "$speed"
   printf 'colors=%s\n' "$colors"
+  printf 'graphics=%s\n' "$graphics"
   printf 'show_status=%s\n' "$show_status"
 }
 

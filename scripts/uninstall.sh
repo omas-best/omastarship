@@ -42,7 +42,8 @@ if [[ -L $command_path ]]; then
   fi
 fi
 
-rm -f "$install_root/bin/omastarship" "$install_root/shell/omastarship.bash"
-rmdir "$install_root/bin" "$install_root/shell" "$install_root" 2>/dev/null || true
+rm -f "$install_root/bin/omastarship" "$install_root/shell/omastarship.bash" "$install_root/assets/rocket-concept-v2.png"
+rm -f "$install_root/assets/sixel/ignition.sixel" "$install_root/assets/sixel/launch.sixel" "$install_root/assets/sixel/descent.sixel" "$install_root/assets/sixel/catch.sixel"
+rmdir "$install_root/bin" "$install_root/shell" "$install_root/assets/sixel" "$install_root/assets" "$install_root" 2>/dev/null || true
 
 printf 'Uninstalled OmaStarship. User configuration was kept in %s.\n' "${XDG_CONFIG_HOME:-$HOME/.config}/omastarship"

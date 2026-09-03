@@ -4,4 +4,5 @@ push_animation=true
 pull_animation=true
 speed=normal
 colors=omarchy
+graphics=auto
 show_status=true
