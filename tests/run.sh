@@ -126,14 +126,15 @@ assert_status 'Foot illustrated push demo' 0 "$?"
 assert_contains 'Foot push emits packaged Sixel art' "$tmp/push-sixel.typescript" $'\033P0;1;0q'
 if grep -Fq '| OM |' "$tmp/push-sixel.typescript"; then fail 'Foot push avoids ASCII rocket'; else pass 'Foot push avoids ASCII rocket'; fi
 push_sixel_frames=$(LC_ALL=C grep -ao $'\033P0;1;0q' "$tmp/push-sixel.typescript" | wc -l)
-if ((push_sixel_frames == 11)); then pass 'illustrated push moves through 11 frames'; else fail "illustrated push frame count (expected 11, got $push_sixel_frames)"; fi
+if ((push_sixel_frames == 36)); then pass 'illustrated push accelerates through 36 frames'; else fail "illustrated push frame count (expected 36, got $push_sixel_frames)"; fi
+assert_contains 'illustrated push uses synchronized updates' "$tmp/push-sixel.typescript" $'\033[?2026h'
 
 TERM=foot OMASTARSHIP_GRAPHICS=auto OMASTARSHIP_TEST_NO_SLEEP=1 script -qefc "stty rows 24 cols 80; '$root/bin/omastarship' demo pull" "$tmp/pull-sixel.typescript" >/dev/null
 assert_status 'Foot illustrated pull demo' 0 "$?"
 assert_contains 'Foot pull emits packaged Sixel art' "$tmp/pull-sixel.typescript" $'\033P0;1;0q'
 assert_contains 'illustrated pull keeps catch label' "$tmp/pull-sixel.typescript" 'CAUGHT'
 pull_sixel_frames=$(LC_ALL=C grep -ao $'\033P0;1;0q' "$tmp/pull-sixel.typescript" | wc -l)
-if ((pull_sixel_frames == 20)); then pass 'illustrated pull moves rocket beside fixed tower'; else fail "illustrated pull frame count (expected 20, got $pull_sixel_frames)"; fi
+if ((pull_sixel_frames == 46)); then pass 'illustrated pull eases rocket beside fixed tower'; else fail "illustrated pull frame count (expected 46, got $pull_sixel_frames)"; fi
 
 TERM=xterm-256color OMASTARSHIP_TEST_NO_SLEEP=1 script -qefc "stty rows 50 cols 160; '$root/bin/omastarship' demo pull" "$tmp/pull.typescript" >/dev/null
 assert_status 'large pull demo' 0 "$?"

@@ -4,7 +4,7 @@ Turn Git pushes into rocket launches and Git pulls into booster catches.
 
 ![OmaStarship illustrated rocket states](assets/rocket-concept-v2.png)
 
-The terminal animation uses separate illustrated rocket and catch-tower sprites. On push, the rocket launches from the lower-right corner and exits through the top. On pull, the tower stays at the lower-right while the rocket descends from the upper-right into its open arms. Foot on Omarchy renders the sprites through its built-in Sixel image support.
+The terminal animation uses separate illustrated rocket and catch-tower sprites. On push, the rocket lingers at the lower-right, accelerates upward, and leaves through the top edge. On pull, the tower stays at the lower-right while the rocket enters from above, accelerates through its descent, brakes into the open arms, and holds on the catch. Foot on Omarchy renders complete frames with synchronized Sixel updates to reduce flicker.
 
 OmaStarship adds a short animation before interactive `git push` and `git pull` commands. It then gets out of the way and replaces itself with the real Git executable. Git receives the original argument array and direct access to stdin, stdout, and stderr.
 

@@ -45,6 +45,8 @@ fi
 rm -f "$install_root/bin/omastarship" "$install_root/shell/omastarship.bash" "$install_root/assets/rocket-concept-v2.png"
 rm -f "$install_root/assets/sixel/ignition.sixel" "$install_root/assets/sixel/launch.sixel" "$install_root/assets/sixel/descent.sixel" "$install_root/assets/sixel/catch.sixel"
 rm -f "$install_root/assets/sixel-motion/launch.sixel" "$install_root/assets/sixel-motion/descent.sixel" "$install_root/assets/sixel-motion/tower.sixel"
+rm -f "$install_root/assets/sixel-motion/launch-exit-1.sixel" "$install_root/assets/sixel-motion/launch-exit-2.sixel" "$install_root/assets/sixel-motion/launch-exit-3.sixel"
+rm -f "$install_root/assets/sixel-motion/descent-enter-1.sixel" "$install_root/assets/sixel-motion/descent-enter-2.sixel" "$install_root/assets/sixel-motion/descent-enter-3.sixel"
 rmdir "$install_root/bin" "$install_root/shell" "$install_root/assets/sixel" "$install_root/assets/sixel-motion" "$install_root/assets" "$install_root" 2>/dev/null || true
 
 printf 'Uninstalled OmaStarship. User configuration was kept in %s.\n' "${XDG_CONFIG_HOME:-$HOME/.config}/omastarship"
