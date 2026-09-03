@@ -57,6 +57,7 @@ omastarship demo push
 omastarship demo pull
 omastarship enable
 omastarship disable
+omastarship graphics auto|sixel|ascii
 omastarship status
 omastarship config
 ```
@@ -83,7 +84,7 @@ graphics=auto
 show_status=true
 ```
 
-Valid speeds are `fast`, `normal`, and `cinematic`. Valid color modes are `omarchy` and `none`. `NO_COLOR` also disables ANSI colors. `graphics=auto` displays the packaged illustrations in Foot, `graphics=sixel` explicitly enables them on another Sixel-capable terminal, and `graphics=ascii` always uses the fallback. No image converter runs during Git commands. Environment variables override the file for one process:
+Valid speeds are `fast`, `normal`, and `cinematic`. Valid color modes are `omarchy` and `none`. `NO_COLOR` also disables ANSI colors. `graphics=auto` displays the packaged illustrations in Foot, including Foot configured with `term=xterm-256color`. `graphics=sixel` explicitly enables them on another Sixel-capable terminal, and `graphics=ascii` always uses the fallback. No image converter runs during Git commands. Environment variables override the file for one process:
 
 ```text
 OMASTARSHIP

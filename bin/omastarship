@@ -3,7 +3,7 @@
 # OmaStarship command and animation renderer.
 set -u
 
-OMASTARSHIP_VERSION="0.2.0"
+OMASTARSHIP_VERSION="0.2.1"
 _omastarship_alt_active=0
 _omastarship_resize_pending=0
 _omastarship_rows=24
@@ -169,10 +169,25 @@ _omastarship_can_sixel() {
   art_dir=$(_omastarship_art_dir)
   [[ -r $art_dir/ignition.sixel && -r $art_dir/launch.sixel && -r $art_dir/descent.sixel && -r $art_dir/catch.sixel ]] || return 1
   [[ $graphics == sixel ]] && return 0
-  case ${TERM:-} in
-    foot*|*sixel*) return 0 ;;
-    *) return 1 ;;
-  esac
+  _omastarship_is_sixel_terminal
+}
+
+_omastarship_is_sixel_terminal() {
+  case ${TERM:-} in foot*|*sixel*) return 0 ;; esac
+
+  local pid=$PPID comm parent hops=0
+  while [[ $pid =~ ^[0-9]+$ ]] && ((pid > 1 && hops < 6)); do
+    if [[ -r /proc/$pid/comm ]]; then
+      IFS= read -r comm < "/proc/$pid/comm" || comm=''
+      case $comm in foot|footclient) return 0 ;; esac
+    fi
+    [[ -r /proc/$pid/status ]] || break
+    parent=$(awk '$1 == "PPid:" { print $2; exit }' "/proc/$pid/status" 2>/dev/null) || break
+    [[ -n $parent && $parent != "$pid" ]] || break
+    pid=$parent
+    hops=$((hops + 1))
+  done
+  return 1
 }
 
 _omastarship_graphics_delay() {
@@ -376,6 +391,7 @@ Commands:
   demo push|pull   Play an animation without running Git
   enable           Enable animations in the user config
   disable          Disable animations in the user config
+  graphics MODE    Set graphics to auto, sixel, or ascii
   status           Show version, shell integration, and effective settings
   config           Print the effective configuration
   help             Show this help
@@ -403,6 +419,15 @@ case ${1:-help} in
   disable)
     _omastarship_write_setting enabled false
     printf 'OmaStarship disabled.\n'
+    ;;
+  graphics)
+    case ${2:-} in
+      auto|sixel|ascii)
+        _omastarship_write_setting graphics "$2"
+        printf 'OmaStarship graphics=%s.\n' "$2"
+        ;;
+      *) printf 'Usage: omastarship graphics <auto|sixel|ascii>\n' >&2; exit 2 ;;
+    esac
     ;;
   config)
     _omastarship_print_config

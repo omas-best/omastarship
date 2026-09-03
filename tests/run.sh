@@ -109,6 +109,12 @@ PATH="$tmp/fake-bin:$PATH" OMASTARSHIP_BIN="$tmp/missing" FAKE_GIT_LOG="$tmp/arg
 assert_status 'missing animator falls back to Git' 0 "$?"
 check_args 'fallback keeps arguments' push fallback
 
+XDG_CONFIG_HOME="$tmp/config-cli" "$root/bin/omastarship" graphics sixel > "$tmp/config-cli.out"
+assert_status 'graphics command accepts sixel' 0 "$?"
+assert_contains 'graphics command writes sixel mode' "$tmp/config-cli/omastarship/config" 'graphics=sixel'
+XDG_CONFIG_HOME="$tmp/config-cli" "$root/bin/omastarship" config > "$tmp/config-cli-print.out"
+assert_contains 'effective config reports sixel mode' "$tmp/config-cli-print.out" 'graphics=sixel'
+
 TERM=xterm-256color OMASTARSHIP_TEST_NO_SLEEP=1 script -qefc "stty rows 24 cols 80; '$root/bin/omastarship' demo push" "$tmp/push.typescript" >/dev/null
 assert_status '80x24 push demo' 0 "$?"
 assert_contains 'push enters alternate screen' "$tmp/push.typescript" $'\033[?1049h'
