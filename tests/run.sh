@@ -5,6 +5,7 @@ set -u
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+export XDG_CONFIG_HOME="$tmp/config"
 passes=0
 failures=0
 
@@ -124,11 +125,15 @@ TERM=foot OMASTARSHIP_GRAPHICS=auto OMASTARSHIP_TEST_NO_SLEEP=1 script -qefc "st
 assert_status 'Foot illustrated push demo' 0 "$?"
 assert_contains 'Foot push emits packaged Sixel art' "$tmp/push-sixel.typescript" $'\033P0;1;0q'
 if grep -Fq '| OM |' "$tmp/push-sixel.typescript"; then fail 'Foot push avoids ASCII rocket'; else pass 'Foot push avoids ASCII rocket'; fi
+push_sixel_frames=$(LC_ALL=C grep -ao $'\033P0;1;0q' "$tmp/push-sixel.typescript" | wc -l)
+if ((push_sixel_frames == 11)); then pass 'illustrated push moves through 11 frames'; else fail "illustrated push frame count (expected 11, got $push_sixel_frames)"; fi
 
 TERM=foot OMASTARSHIP_GRAPHICS=auto OMASTARSHIP_TEST_NO_SLEEP=1 script -qefc "stty rows 24 cols 80; '$root/bin/omastarship' demo pull" "$tmp/pull-sixel.typescript" >/dev/null
 assert_status 'Foot illustrated pull demo' 0 "$?"
 assert_contains 'Foot pull emits packaged Sixel art' "$tmp/pull-sixel.typescript" $'\033P0;1;0q'
 assert_contains 'illustrated pull keeps catch label' "$tmp/pull-sixel.typescript" 'CAUGHT'
+pull_sixel_frames=$(LC_ALL=C grep -ao $'\033P0;1;0q' "$tmp/pull-sixel.typescript" | wc -l)
+if ((pull_sixel_frames == 20)); then pass 'illustrated pull moves rocket beside fixed tower'; else fail "illustrated pull frame count (expected 20, got $pull_sixel_frames)"; fi
 
 TERM=xterm-256color OMASTARSHIP_TEST_NO_SLEEP=1 script -qefc "stty rows 50 cols 160; '$root/bin/omastarship' demo pull" "$tmp/pull.typescript" >/dev/null
 assert_status 'large pull demo' 0 "$?"
@@ -162,12 +167,13 @@ HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_CONFIG_HOME="$home/.config" 
 HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_CONFIG_HOME="$home/.config" "$root/scripts/install.sh" >> "$tmp/install.out"
 if [[ $(grep -Fc '# >>> omastarship >>>' "$home/.bashrc") == 1 ]]; then pass 'installer is idempotent'; else fail 'installer duplicated shell block'; fi
 if [[ -x $home/.local/bin/omastarship ]]; then pass 'installer creates command'; else fail 'installer did not create command'; fi
-if [[ -s $home/.local/share/omastarship/assets/sixel/launch.sixel ]]; then pass 'installer includes illustrated frames'; else fail 'installer omitted illustrated frames'; fi
+if [[ -s $home/.local/share/omastarship/assets/sixel-motion/launch.sixel && -s $home/.local/share/omastarship/assets/sixel-motion/tower.sixel ]]; then pass 'installer includes motion sprites'; else fail 'installer omitted motion sprites'; fi
 HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_CONFIG_HOME="$home/.config" "$root/scripts/uninstall.sh" > "$tmp/uninstall.out"
 if grep -Fq '# >>> omastarship >>>' "$home/.bashrc"; then fail 'uninstaller left shell block'; else pass 'uninstaller removes shell block'; fi
 if [[ -e $home/.local/bin/omastarship ]]; then fail 'uninstaller left command'; else pass 'uninstaller removes command'; fi
 if [[ -f $home/.config/omastarship/config ]]; then pass 'uninstaller preserves user config'; else fail 'uninstaller removed user config'; fi
 if [[ -e $home/.local/share/omastarship/assets/sixel/launch.sixel ]]; then fail 'uninstaller left illustrated frames'; else pass 'uninstaller removes illustrated frames'; fi
+if [[ -e $home/.local/share/omastarship/assets/sixel-motion/tower.sixel ]]; then fail 'uninstaller left motion sprites'; else pass 'uninstaller removes motion sprites'; fi
 
 printf '\n%d passed, %d failed\n' "$passes" "$failures"
 ((failures == 0))
